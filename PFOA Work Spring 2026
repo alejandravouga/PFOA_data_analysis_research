@@ -1,0 +1,7 @@
+Alejandra Vouga Aguilera
+Kathryn Montovan, Tim Schroeder
+Spring 2026 | PFOA Group Research Tutorial | Senior Work
+ENV 4696: Group Tutorial: Advanced Work in PFAS Groundwater Contamination II
+May 28, 2026
+
+Document Description: This final document contains the work I have done during Spring 2026 in a sequence of coding and explanations along with the code. It shows the progress through cleaning the datasets, merging them to create the first “master dataset,” then checking and acknowledging duplicates, understanding the reasons behind those arrangements, and making decisions upon those findings. After revision, Professor Katie Montovan made a new master dataset so we could use it in our exploratory visualizations of the data. Therefore, this document contains several attempts until finally having a stable dataset we could work with. Then, visualizations were made in order to explore each of the factors that could influence the PFOA concentrations. Bearing and aspect were the topics I researched different visualization methods to experiment with; therefore, all graphs in this document are exploratory and should not be considered final.
