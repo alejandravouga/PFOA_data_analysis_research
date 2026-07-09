@@ -1,0 +1,5 @@
+Alejandra Vouga Aguilera
+Kathryn Montovan, Tim Schroeder
+Winter FWT Period 2026 | PFOA Group Research | Preliminary Analysis for Senior Work
+
+Document Description: This final document contains the work I have done during Winter FWT(Field Work Term) 2026 in a sequence of coding and explanations along with the code. It shows the progress through cleaning the datasets, and the creation of the “Bennington wells dataset”, in R so it can be used in the future. This document contains several attempts until finally having a stable dataset we could work with. It was decided not to use it in the Spring 2026 Tutorial, because of the lower sampling frequency. Nevertheless, it remains a highly valuable, stable local dataset for future academic study and research.
