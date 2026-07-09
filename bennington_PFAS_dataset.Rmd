@@ -1,0 +1,93 @@
+---
+title: "PFOA Senior Work Final Graphs"
+author: "Alejandra Vouga"
+date: "2026-05-05"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+
+DEC_dt_1_original <- read.csv("~/Desktop/PFAS Project 2026/DEC Original Data/Cleaned_Data_Oct31-2025 (1).csv")
+ View(DEC_dt_1_original)
+  
+
+DEC_dt_1_cleaned <- DEC_dt_1_original %>%
+  mutate(SiteSampleDate = as.Date(SiteSampleDate, format = "%m/%d/%y"))  %>%
+  filter(SampleCollection %in% c("Raw", "POET Influent", "raw", "influent")) %>%
+  mutate(SampleCollection = recode(SampleCollection,"raw" = "Raw"))%>%
+  mutate(SiteID = as.character(SiteID))%>% 
+  mutate(dataset="DEC_dt_1")%>%
+  select(
+    site_ID = SiteID,
+    address = SiteLocationID,
+    dataset,
+    sample_date = SiteSampleDate,
+    sample_collection = SampleCollection,
+    PFOA
+  )
+View(DEC_dt_1_cleaned)
+bearings_distances_DEC_dt_1 <- read.csv("~/Desktop/PFAS Project 2026/DEC Original Data/bearings_distances_Initial_DEC_Dataset (1).csv") %>%
+  select(
+    site_ID = SiteID,
+    lat = SiteLatitude,
+    long = SiteLongitude,
+    distance_to_chemfab = Distance.to.ChemFab..m.,
+    bearing = Bearing.correct
+  )
+
+merged_DEC_1 <- merge (bearings_distances_DEC_dt_1, DEC_dt_1_cleaned, by = "site_ID") %>% 
+  mutate(bearing_cat = cut(bearing, breaks= c(22.5,67.5,112.5,157.5,202.1,247.5,292.5,337.5, 360,0),labels=c(1,2,3,4,5,6,7,8,1))) %>% 
+  mutate(bearing_cat = as.numeric (bearing_cat))
+
+slope_aspect_DEC <- read.csv("~/Desktop/PFAS Project 2026/DEC Original Data/DECwells_slope&aspect.csv") %>% 
+  select(
+    site_ID = SiteID,
+    aspect = aspect_reclass1,
+    slope = slope1
+  )
+
+merged_DEC_1_2 <- merge (merged_DEC_1, slope_aspect_DEC, by = "site_ID") %>% 
+  mutate(BA_difference = aspect - bearing_cat) %>% 
+  mutate(merged_DEC_1_2, slope_direction = case_when(BA_difference== 0 ~ "Away", BA_difference== 4 ~"Towards", BA_difference== -4 ~"Towards", BA_difference==1|2|3|-1|-2|-3 ~ "NA"))
+
+DEC_dt_1 <- merged_DEC_1_2 #Here I got DEC_dt_1 dataset done!
+
+write.csv(DEC_dt_1, "~/Desktop/PFAS Project 2026/DEC_dt_1.csv", row.names = FALSE)
+
+#merged_DEC_1_2%>%group_by(site_ID)%>%summarize(n())
+
+#merged_DEC_1_2 %>% select(site_ID, address, sample_date)%>% group_by(site_ID, address, sample_date) %>% summarise(count=(n())) %>% group_by(address, sample_date) %>% summarise(count=(n()))  #spelling matters, capitalization too! all of them are counted separetely!
+
+DEC_dt_2 <- read.csv("~/Desktop/PFAS Project 2026/SGPP_Merged.csv") %>% 
+  rename(
+    address = Address,
+    dataset = Dataset,
+    lat = Latitude,
+    long = Longitude,
+    distance_to_chemfab = Distance.to.ChemFab..m.,
+    bearing = Bearing.correct,
+    aspect = Aspect,
+    sample_date = Sampledate,
+    PFOA = PFOA2,
+    slope = Slope,
+    BA_difference = BA_diff,
+    slope_direction = Slope_Direction,
+  ) %>% 
+  mutate(site_ID = as.character(site_ID))%>%
+  mutate(sample_date = as.Date(sample_date, format = "%m/%d/%Y")) %>%
+  select()
+
+DEC_masterdataset <-  bind_rows(DEC_dt_1, DEC_dt_2) %>% #Finally got the DEC masterdataset!
+  arrange(site_ID)
+
+write.csv(DEC_masterdataset, "~/Desktop/PFAS Project 2026/DEC_masterdataset.csv", row.names = FALSE)
+View(DEC_masterdataset)
+
+#DEC_masterdataset %>% group_by(site_ID, address) %>% summarise(count= n()) %>% filter(count >1) #me just trying to see the duplicates!
+
+site_counts <- merged_fixed_data %>%
+   group_by(site_ID, lat, long) %>%
+   summarise(count = n(), .groups = "drop")
+```
+
