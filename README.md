@@ -1,1 +1,1 @@
-# PFOA_data_analysis_research
+These files represent two years of environmental data research on PFAS (forever chemicals) in Bennington, VT, conducted alongside my research team. The dataset includes a bedrock overlay analysis, spatial and statistical data analysis, and the extensive research that served as the foundation for my degree in Data Science and Environmental Science.
