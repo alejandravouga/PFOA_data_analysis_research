@@ -1,0 +1,408 @@
+---
+title: "PFOA Work Spring 2026"
+author: "Alejandra Vouga"
+date: "2026-03-03"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+library(dplyr)
+
+#dataset: DEC_dt_1_original
+
+DEC_dt_1_original <- read.csv("~/Desktop/PFAS Project 2026/DEC Original Data/Cleaned_Data_Oct31-2025 (1).csv")
+ View(DEC_dt_1_original)
+
+DEC_dt_1_cleaned <- DEC_dt_1_original %>%
+  mutate(SiteSampleDate = as.Date(SiteSampleDate, format = "%m/%d/%y"))  %>%
+  filter(SampleCollection %in% c("Raw", "POET Influent", "raw", "influent")) %>%
+  mutate(SampleCollection = recode(SampleCollection,"raw" = "Raw"))%>%
+  mutate(SiteID = as.character(SiteID))%>% 
+  mutate(dataset="DEC_dt_1")%>%
+  select(
+    site_ID = SiteID,
+    address = SiteLocationID,
+    dataset,
+    sample_date = SiteSampleDate,
+    sample_collection = SampleCollection,
+    PFOA
+  )
+
+#adding bearing:
+bearings_distances_DEC_dt_1 <- read.csv("~/Desktop/PFAS Project 2026/DEC Original Data/bearings_distances_Initial_DEC_Dataset (1).csv") %>%
+  select(
+    site_ID = SiteID,
+    lat = SiteLatitude,
+    long = SiteLongitude,
+    distance_to_chemfab = Distance.to.ChemFab..m.,
+    bearing = Bearing.correct
+  )
+
+#cutting bearing:
+merged_DEC_1 <- merge (bearings_distances_DEC_dt_1, DEC_dt_1_cleaned, by = "site_ID") %>% 
+  mutate(bearing_cat = cut(bearing, breaks= c(22.5,67.5,112.5,157.5,202.1,247.5,292.5,337.5, 360,0),labels=c(1,2,3,4,5,6,7,8,1))) %>% 
+  mutate(bearing_cat = as.numeric (bearing_cat))
+
+#adding slope:
+slope_aspect_DEC <- read.csv("~/Desktop/PFAS Project 2026/DEC Original Data/DECwells_slope&aspect.csv") %>% 
+  select(
+    site_ID = SiteID,
+    aspect = aspect_reclass1,
+    slope = slope1
+  )
+
+#adding BA difference:
+merged_DEC_1_2 <- merge (merged_DEC_1, slope_aspect_DEC, by = "site_ID") %>% 
+  mutate(BA_difference = aspect - bearing_cat) %>% 
+  mutate(merged_DEC_1_2, slope_direction = case_when(BA_difference== 0 ~ "Away", BA_difference== 4 ~"Towards", BA_difference== -4 ~"Towards", BA_difference==1|2|3|-1|-2|-3 ~ "NA"))
+
+DEC_dt_1 <- merged_DEC_1_2 #Here I got DEC_dt_1 dataset done!
+
+write.csv(DEC_dt_1, "~/Desktop/PFAS Project 2026/DEC_dt_1.csv", row.names = FALSE)
+
+#dataset: DEC_dt_2
+
+DEC_dt_2 <- read.csv("~/Desktop/PFAS Project 2026/SGPP_Merged.csv") %>% 
+  rename(
+    address = Address,
+    dataset = Dataset,
+    lat = Latitude,
+    long = Longitude,
+    distance_to_chemfab = Distance.to.ChemFab..m.,
+    bearing = Bearing.correct,
+    aspect = Aspect,
+    sample_date = Sampledate,
+    PFOA = PFOA2,
+    slope = Slope,
+    BA_difference = BA_diff,
+    slope_direction = Slope_Direction,
+  ) %>% 
+  mutate(site_ID = as.character(site_ID))%>%
+  mutate(sample_date = as.Date(sample_date, format = "%m/%d/%Y")) %>%
+  select()
+
+#main join: DEC_dt_1 + DEC_dt_2
+DEC_masterdataset <-  bind_rows(DEC_dt_1, DEC_dt_2) %>% #got the DEC masterdataset!
+  arrange(site_ID)
+
+write.csv(DEC_masterdataset, "~/Desktop/PFAS Project 2026/DEC_masterdataset.csv", row.names = FALSE)
+View(DEC_masterdataset)
+
+#DEC_masterdataset %>% group_by(site_ID, address) %>% summarise(count= n()) %>% filter(count >1) #me just trying to see the duplicates!
+
+site_counts <- merged_fixed_data %>%
+   group_by(site_ID, lat, long) %>%
+   summarise(count = n(), .groups = "drop")
+```
+
+```{r}
+#Tim's dataset: DataRaw_DEC_untreated.water
+DataRaw_DEC_untreated.water <- read.csv("~/Desktop/PFAS Project 2026/Tim Fixed Data 03:24/DataRaw_DEC_untreated-water.csv")%>%
+  filter(if_any(everything(), ~ !is.na(.) & . != "")) %>%  #to delete any rows that migth be empty or contain any empty space and NAs
+ mutate(SiteSampleDate = as.Date(SiteSampleDate, format = "%m/%d/%y")) %>%
+  select(
+   site_ID = SiteID,
+   address = Address,
+   site_location_ID = SiteLocationID,
+   sample_date = SiteSampleDate,
+   lat = SiteLatitude,
+   long = SiteLongitude,
+   sample_collection = SampleCollection,
+   PFOA,
+ )
+
+#Tim's data with bearing:
+BearingandDistance_fixedDECdata <- read.csv("~/Desktop/PFAS Project 2026/BearingandDistance_fixedDECdata.csv") %>%
+  select(
+   site_ID = Site.ID,
+   distance_chemfab = Distance.from.ChemFab,
+   bearing_chemfab = BearingFromChemFab,
+  )
+
+#bearing categories:
+merged_fixed_data <- merge (DataRaw_DEC_untreated.water, BearingandDistance_fixedDECdata, by = "site_ID") %>% 
+  mutate(bearing_cat = cut(bearing_chemfab, breaks= c(22.5,67.5,112.5,157.5,202.1,247.5,292.5,337.5, 360,0),labels=c(1,2,3,4,5,6,7,8,1))) %>% 
+  mutate(bearing_cat = as.numeric (bearing_cat))
+
+#Tim's data with aspect and slope:
+Sites_with_slope.and.aspect <- read.csv("~/Desktop/PFAS Project 2026/3:30:2026/Sites_with_slope-and-aspect.csv")%>%
+  select(
+    fid,
+    site_ID = Site.ID,
+    slope = Slope1,
+    aspect = Aspect1
+  )
+#Adding BA difference for Tim's dataset:
+merged_timsdataset <- merge (merged_fixed_data, Sites_with_slope.and.aspect, by = "site_ID") %>% 
+  mutate(BA_difference = aspect - bearing_cat) %>% 
+  mutate(merged_timsdataset, slope_direction = case_when(BA_difference== 0 ~ "Away", BA_difference== 4 ~"Towards", BA_difference== -4 ~"Towards", BA_difference==1|2|3|-1|-2|-3 ~ "NA"))
+
+write.csv(merged_timsdataset, "~/Desktop/PFAS Project 2026/merged_timsdataset.csv", row.names = FALSE)
+```
+
+```{r}
+#Katie's Full Fixed Dataset:
+library(dplyr)
+library(ggplot2)
+
+FullData_April4_2026 <- read.csv("~/Desktop/PFAS Project 2026/FullData_April4_2026.csv") %>%
+  select(-X) %>% 
+  mutate(
+    Date = as.Date(Date),
+    Month = as.numeric(format(Date, "%m")), 
+    
+    Season = case_when( 
+      Month %in% c(12, 1, 2) ~ "Winter",
+      Month %in% c(3, 4, 5)  ~ "Spring",
+      Month %in% c(6, 7, 8)  ~ "Summer",
+      Month %in% c(9, 10, 11) ~ "Fall",
+      TRUE                    ~ "Unknown"  
+    ),
+    Season = factor(Season, levels = c("Spring", "Summer", "Fall", "Winter", "Unknown")) 
+  )
+
+#finding duplicates:
+duplicate_counts <- FullData_April4_2026 %>% #this is the duplicated counts I have! 
+  count(dataset, SiteID, Latitude, Longitude, Date, Month, Year, DOY, Distance, Bearing, Aspect_cat, Slope, StreamDischarge_10d, StreamDischarge_15d, Bearing_cat, BA_difference, Slope_direction) %>%
+  filter(n > 1) #Here I found a duplicate that is identical! We can delete this!
+
+#SiteID:S107, 2018-03-20, PFOA:920 n:2
+
+library(stringr)
+full_data_clean <- FullData_April4_2026 %>%
+  distinct(dataset, SiteID, Latitude, Longitude, Date, Month, Year, DOY, WellType, WellDepth, Distance, Bearing, Aspect_cat, Slope, StreamDischarge_10d, StreamDischarge_15d, Bearing_cat, BA_difference, Slope_direction, PFOA, .keep_all = TRUE)%>%
+  mutate(WellType = str_to_title(WellType))
+
+well_check <- full_data_clean %>% distinct(WellType) %>% 
+   arrange(desc(WellType))
+
+#We want to prepare our data better in order to look at the time series test: Auggie suggested Kendall test seasonal/no seasonal
+
+#Now, we just wanna put them in maximum date and minimum date, finding the time span
+
+#this is what Auggie did!(I wanna learn about this as well but it might not be very useful of my time as of now!)
+dates_trial <-full_data_april4_2026%>%
+  group_by(SiteID)%>%
+  summarize(n(),FirstDate= min(Date),LastDate= max(Date),SampleCount= n_distinct(Date,na.rm = TRUE))%>%
+  mutate(NumberDays=LastDate-FirstDate)%>%
+  filter(NumberDays>2190&SampleCount>=8)%>%
+  filter(FirstDate>=2016-01-01)
+
+#this is my trial:
+dates_trial_2 <- full_data_april4_2026 %>%
+  mutate(Date = as.Date(Date)) %>%
+  filter(Date >= as.Date("2016-01-01")) %>% #set up to just be this!
+  group_by(SiteID) %>%
+  mutate(Years_Count = n_distinct(Year),
+  Samples_in_2016 = sum(Year == 2016, na.rm = TRUE),
+  Samples_in_2017 = sum(Year ==2017, na.rm = TRUE),
+  Samples_in_2018 = sum(Year == 2018, na.rm = TRUE),
+  Samples_in_2019 = sum(Year ==2019, na.rm = TRUE),
+  Samples_in_2020 = sum(Year == 2020, na.rm = TRUE),
+  Samples_in_2021 = sum(Year ==2021, na.rm = TRUE)
+  ) %>%
+  filter(Years_Count >= 5 & Samples_in_2016 >= 5) %>%
+  ungroup()
+
+#Goals:
+#make some graphs for bearings + aspect: Alecita
+#active trees + discharge: Kasha
+#distance + time: Auggie
+```
+
+
+```{r}
+#month, season vs PFOA levels:
+ggplot(FullData_April4_2026, aes(x = factor(Month), y = PFOA)) +
+  geom_boxplot(aes(fill = Season), outlier.shape = NA, alpha = 0.5) +
+  geom_jitter(aes(color = Season), width = 0.2, alpha = 0.6, size = 1.5) +
+  scale_y_log10() + 
+  theme_light() +
+  scale_fill_manual(values = c("Spring"  = "blue", 
+                               "Summer"  = "green", 
+                               "Fall"    = "pink", 
+                               "Winter"  = "yellow", 
+                               "Unknown" = "gray")) +  
+  scale_color_manual(values = c("Spring"  = "#707070", 
+                                "Summer"  = "#707070", 
+                                "Fall"    = "#707070", 
+                                "Winter"  = "#707070", 
+                                "Unknown" = "#FF0000")) + #unknown is if the code is finding something else!
+  labs(title = "PFOA Concentration by Month",
+       x = "Month", 
+       y = "PFOA (log scale)")
+```
+
+```{r}
+#graphs with new dataset: FullData_April29_2026.csv
+#cleaning it! checking everything!
+#2194 rows after filtering the dates with Auggie's dataset!
+
+FullData_April29_2026 <- read.csv("~/Desktop/PFAS Project 2026/FullData_April29_2026.csv") %>%
+  select(-X) %>%                
+  mutate(Date = as.Date(Date))
+
+str(FullData_April29_2026) #4956 obs. of  20 variables #This is unfiltered!
+
+#this is to take the one row that was a duplicate nearby chemfab! PFOA: 920!
+FullData_April29_2026 <- distinct(FullData_April29_2026,dataset, SiteID, Latitude, Longitude, Date, Month, Year, DOY, Distance, Bearing, Aspect_cat, Slope, StreamDischarge_10d, StreamDischarge_15d, Bearing_cat, PFOA, BA_diff, .keep_all=TRUE)
+
+str(FullData_April29_2026) #4955 obs. of  20 variables #This is filtered!
+
+duplicate_counts <- FullData_April29_2026 %>% #this is the duplicated counts I have!
+  count(dataset, SiteID, Latitude, Longitude, Date, Month, Year, DOY, Distance, Bearing, Aspect_cat, Slope, StreamDischarge_10d, StreamDischarge_15d, Bearing_cat, PFOA, BA_diff) %>%
+  filter(n > 1) #Here I found a duplicate that is identical! We can delete this!
+
+#SiteID:S107, 2018-03-20, PFOA:920 n:2
+#now is zero duplicates!
+
+#this shows ONLY the rows with NA in "Aspect_cat" and "Bearing_cat"
+FullData_April29_2026 %>%
+  filter(is.na(Aspect_cat)) %>% 
+  filter(is.na(Bearing_cat))
+#decided to take all the rows that appear to have NAs in Aspect_cat and Bearing_cat! just because Tim said let's not worry about them anymore and just do the ones that have a value!
+
+ManySampleSites <- FullData_April29_2026%>%
+  group_by(SiteID)%>%
+  summarize(n(),FirstDate= min(Date),LastDate= max(Date),SampleCount= n_distinct(Date,na.rm = TRUE))%>%
+  mutate(NumberDays=LastDate-FirstDate)%>%
+  filter(NumberDays>2190&SampleCount>=8)%>%
+  filter(FirstDate>=2016-01-01)
+
+View(ManySampleSites)
+str(FullData_April29_2026)
+
+FullData_April29_2026 %>% left_join(ManySampleSites) %>% 
+group_by(SiteID)
+```
+
+```{r}
+#graphs using Katie's dataset: full_data_april29_2026
+#goal: make some graphs for bearings + aspect, Alecita
+
+#all libraries for graphs:
+install.packages("ggcorrplot")
+install.packages("patchwork")
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(patchwork) #library for combining plots
+library(ggcorrplot) #this is for correlation matrix
+```
+
+
+```{r}
+#1) PFOA rose map (Bearing): shows which compass direction from the source has the highest average contamination!
+ggplot(FullData_April29_2026 %>% 
+         filter(Distance>2000), aes(x = factor(Bearing_cat), y = PFOA, fill = factor(Bearing_cat))) +
+  geom_bar(stat = "summary", fun = "mean", width = 1, color = "white") +
+  coord_polar(start = 0) +
+  theme_minimal() +
+  labs(title = "Mean PFOA Concentration by Bearing Category", x = "Bearing Category", fill = "Category")
+```
+
+```{r}
+#2) aspect rose map: did not quite understand this part!
+# ggplot(FullData_April29_2026 %>% 
+#          filter(Distance>2000, BA_diff(2,3,4,5), aes(x = factor(Aspect_cat), y = PFOA, fill = factor(Aspect_cat))) +
+#   geom_bar(stat = "summary", fun = "mean", width = 1, color = "white") +
+#   coord_polar(start = 0) +
+#   scale_fill_brewer(palette = "Set3") +
+#   theme_minimal() +
+#   labs(title = "Mean PFOA by Aspect (Slope Direction)", x = "Aspect Category")
+# 
+# #3) another rose map: Don't know why exactly there are NAs as one of the directions!
+# ggplot(FullData_April29_2026 %>%  
+#          filter(Distance>2000, Bearing_cat %in% c(2, 3, 4, 5)), 
+#        aes(x = factor(Aspect_cat), y = PFOA, fill = factor(Aspect_cat))) +
+#   geom_bar(stat = "summary", fun = "mean", width = 1, color = "white") +
+#   coord_polar(start = 0) +
+#   scale_fill_brewer(palette = "Set3") +
+#   theme_minimal() +
+#   labs(
+#     title = "Mean PFOA by Aspect (Slope Direction)", 
+#     subtitle = "Analysis limited to Bearings 2, 3, 4, and 5",
+#     x = "Aspect Category",
+#     fill = "Aspect",
+#   )
+```
+
+```{r}
+#3) sampling freq rose:
+ggplot(FullData_April29_2026 %>% 
+         filter (Distance>2000), aes(x = factor(Bearing_cat))) +
+  geom_bar(width = 1, fill = "steelblue", color = "white") +
+  coord_polar(start = 0) +
+  theme_minimal() +
+  labs(title = "Frequency of Samples by Bearing")
+```
+
+```{r}
+#bearing and aspect interaction as I think: again something might be wrong in the code because is detecting NAs!
+ggplot(FullData_April4_2026 %>% 
+         filter(Distance>2000), aes(x = factor(BA_difference), y = PFOA, fill = factor(BA_difference))) +
+  geom_boxplot() +
+  scale_y_log10() +
+  theme_minimal() +
+  labs(title = "PFOA Levels vs. Bearing-Aspect Difference",
+       x = "BA Difference (0 = Slope faces source)", y = "PFOA (log scale)")
+```
+```{r}
+#faceted rose plots, seasonal changes:
+ggplot(FullData_April4_2026 %>% 
+         filter(Distance>500), aes(x = factor(Bearing_cat), y = PFOA, fill = factor(Season))) +
+  geom_bar(stat = "summary", fun = "mean", width = 1) +
+  coord_polar() +
+  facet_wrap(~Season) +
+  theme_bw() +
+  labs(title = "Seasonal shift in PFOA bearing")
+```
+
+```{r}
+#distance and topography:
+ggplot(FullData_April4_2026 %>% 
+         filter(Distance>500), aes(x = Distance, y = PFOA, color = factor(Bearing_cat))) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~Bearing_cat) +
+  labs(title = "PFOA Decay by Distance per Bearing Category")
+```
+
+```{r}
+#slope and PFOA: I'd expect to have more with a lower slope value?
+ggplot(FullData_April29_2026 %>% 
+         filter(Distance>2000), aes(x = Slope, y = PFOA)) +
+  geom_point(alpha = 0.5, color = "darkgreen") +
+  geom_smooth(method = "loess") +
+  
+  #LOESS local regression line (which stands for Locally Estimated Scatterplot Smoothing).
+  #Instead of forcing a straight, rigid line through your data (like a standard linear trend line)
+  #a LOESS curve is adaptive. It moves across your data in small geographic windows, calculating a localized average.
+  
+  scale_y_log10() +
+  labs(title = "Slope impact on PFOA")
+```
+
+```{r}
+#does distance matter more in certain slope faces? AGAIN NAs! why do we have NAs here?
+ggplot(FullData_April4_2026 %>% 
+         filter(Distance>2000), aes(x = Distance, y = PFOA)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth() +
+  facet_wrap(~Aspect_cat) +
+  labs(title = "PFOA vs Distance Faceted by Aspect Category")
+```
+
+```{r}
+#numeric columns for correlation: I don't quite understand the logic of the function but it seems that distance has a "stronger" correlation with bearing, how so? I'm not quite sure yet!
+
+corr_data <- FullData_April29_2026 %>%
+  select(PFOA, Distance, Bearing, Slope, Aspect_cat, StreamDischarge_10d) %>%
+  na.omit() %>%
+  cor()
+
+ggcorrplot(corr_data, lab = TRUE, title = "Correlation of PFOA with all the variables")
+```
+
